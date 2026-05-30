@@ -1,0 +1,11 @@
+# 環境変数・シークレット
+.env
+
+# ランタイムデータ（コンテナ実行時に生成、ディレクトリ自体は .gitkeep で管理）
+volumes/logs/*
+!volumes/logs/.gitkeep
+volumes/mitmproxy-ca/*
+!volumes/mitmproxy-ca/.gitkeep
+
+# 一時ファイル
+tmp/

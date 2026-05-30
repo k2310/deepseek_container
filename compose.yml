@@ -1,0 +1,48 @@
+x-podman:
+  in_pod: false
+
+networks:
+  ai-sandbox-net:
+    internal: true        # aider→proxy間の内部通信のみ
+  external-net:
+    internal: false       # proxyがインターネットに出るための経路
+
+services:
+  proxy:
+    image: docker.io/mitmproxy/mitmproxy
+    networks:
+      - ai-sandbox-net    # aiderからの接続を受ける
+      - external-net      # インターネットへ出る
+    command: mitmdump --save-stream-file /logs/traffic.bin
+    volumes:
+      - ./volumes/logs:/logs:rw
+      - ./volumes/mitmproxy-ca:/home/mitmproxy/.mitmproxy:rw
+
+  code:
+    build:
+      context: ./docker
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    networks:
+      - ai-sandbox-net    # proxyにしか繋がれない
+    depends_on:
+      - proxy
+    environment:
+      - HTTPS_PROXY=http://proxy:8080
+      - SSL_CERT_FILE=/ca/mitmproxy-ca-cert.pem
+      - NODE_EXTRA_CA_CERTS=/ca/mitmproxy-ca-cert.pem
+      - ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
+      - ANTHROPIC_AUTH_TOKEN=${DEEPSEEK_API_KEY}
+      - ANTHROPIC_MODEL=deepseek-v4-pro[1m]
+      - ANTHROPIC_DEFAULT_OPUS_MODEL=deepseek-v4-pro[1m]
+      - ANTHROPIC_DEFAULT_SONNET_MODEL=deepseek-v4-pro[1m]
+      - ANTHROPIC_DEFAULT_HAIKU_MODEL=deepseek-v4-flash
+      - CLAUDE_CODE_SUBAGENT_MODEL=deepseek-v4-flash
+      - CLAUDE_CODE_EFFORT_LEVEL=max
+    volumes:
+      - ${WORKSPACE_HOST_PATH}:/workspace:rw
+      - ./volumes/mitmproxy-ca:/ca:ro
+    userns_mode: keep-id
+    stdin_open: true
+    tty: true
