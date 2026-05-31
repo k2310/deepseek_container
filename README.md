@@ -147,6 +147,23 @@ cat /proc/sys/kernel/unprivileged_userns_clone
 # → 1 であればOK（0 なら sudo sysctl kernel.unprivileged_userns_clone=1）
 ```
 
+#### ambient capability 昇格の警告（`can't raise ambient capability`）
+
+`podman-compose up` 等でコンテナ起動時に以下のような警告が出ることがあります：
+
+```
+time="..." level=warning msg="can't raise ambient capability CAP_CHOWN: operation not permitted"
+time="..." level=warning msg="can't raise ambient capability CAP_DAC_OVERRIDE: operation not permitted"
+time="..." level=warning msg="can't raise ambient capability CAP_FOWNER: operation not permitted"
+time="..." level=warning msg="can't raise ambient capability CAP_SETUID: operation not permitted"
+time="..." level=warning msg="can't raise ambient capability CAP_SETGID: operation not permitted"
+（他 CAP_KILL, CAP_NET_BIND_SERVICE, CAP_SETFCAP, CAP_SETPCAP, CAP_SYS_CHROOT 等）
+```
+
+**原因：** OCI ランタイム（crun/runc）がコンテナプロセスのケイパビリティを ambient セットに昇格しようとしますが、WSL2 カーネル（Microsoft カスタムビルド）がユーザー名前空間内での `prctl(PR_CAP_AMBIENT_RAISE, ...)` syscall を追加制限しているため発生します。ネイティブ Linux カーネルでは同操作が許可されているため、同じ設定でもこの警告は出ません。
+
+**実害なし。** ambient への昇格に失敗しても、コンテナ内プロセスは `inheritable` ケイパビリティセット経由で必要な権限を保持するため、コンテナの動作に影響しません。`userns_mode: keep-id` も正常に機能します。
+
 #### マウント伝播の警告（`"/" is not a shared mount`）
 
 `podman system migrate` 等で以下の警告が出ることがあります：
