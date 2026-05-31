@@ -39,17 +39,18 @@ Claude Code を DeepSeek API バックエンドで動かすための、ネット
 
 ### インストール
 
-Ubuntu 24.04 の公式リポジトリに Podman が含まれているので、apt で入ります。
+Ubuntu 24.04 の公式リポジトリに Podman・podman-compose が含まれているので、apt で入ります。
 
 ```bash
 sudo apt update
-sudo apt install -y podman
+sudo apt install -y podman podman-compose
 ```
 
 バージョン確認：
 
 ```bash
 podman --version
+podman-compose --version
 ```
 
 ### rootless 使用のための設定
