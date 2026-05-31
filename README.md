@@ -39,11 +39,27 @@ Claude Code を DeepSeek API バックエンドで動かすための、ネット
 
 ### インストール
 
-Ubuntu 24.04 の公式リポジトリに Podman・podman-compose が含まれているので、apt で入ります。
+Ubuntu 24.04 の公式リポジトリに Podman が含まれているので、apt で入ります。
 
 ```bash
 sudo apt update
-sudo apt install -y podman podman-compose
+sudo apt install -y podman
+```
+
+#### podman-compose は pipx でインストールする（推奨）
+
+apt の podman-compose はパッケージ更新の遅延により古いバージョン（1.0.6 など）が入る場合があります。古いバージョンでは `podman-compose exec` 等の実行時に**環境変数（API キーを含む）がターミナルに平文で出力される**既知の問題があります。pipx で最新版を入れることでこの問題を回避できます。
+
+```bash
+# pipx のインストール
+sudo apt install -y pipx
+pipx ensurepath
+
+# 新しいシェルセッションを開くかパスを反映してから
+source ~/.bashrc  # または ~/.zshrc
+
+# podman-compose のインストール
+pipx install podman-compose
 ```
 
 バージョン確認：
@@ -232,6 +248,7 @@ podman info | grep graphDriverName
 | コンテナが起動直後に落ちる | cgroupv2 無効 | 上記 `.wslconfig` 対応 |
 | DNS が引けない | `aardvark-dns` の WSL2 非互換 | `netavark` → `slirp4netns` に戻す |
 | `can't raise ambient capability ...` の警告（WSL2 のみ） | WSL2 カーネルが `PR_CAP_AMBIENT_RAISE` を制限 | 実害なし。無視して可 |
+| `exec` 時に環境変数・API キーが端末に出力される | podman-compose が古い（apt 版 1.0.6 等） | pipx で最新版に置き換える |
 
 基本的には **systemd 有効 + cgroupv2 有効** の状態にしておくと、後々 Quadlet（systemd サービスとしてコンテナ管理）も使えて運用が楽になります。
 
