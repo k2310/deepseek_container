@@ -231,6 +231,7 @@ podman info | grep graphDriverName
 | `overlay` が使えず `vfs` になる | カーネルの overlay 対応不足 | WSL2 カーネル更新 or `fuse-overlayfs` 導入 |
 | コンテナが起動直後に落ちる | cgroupv2 無効 | 上記 `.wslconfig` 対応 |
 | DNS が引けない | `aardvark-dns` の WSL2 非互換 | `netavark` → `slirp4netns` に戻す |
+| `can't raise ambient capability ...` の警告（WSL2 のみ） | WSL2 カーネルが `PR_CAP_AMBIENT_RAISE` を制限 | 実害なし。無視して可 |
 
 基本的には **systemd 有効 + cgroupv2 有効** の状態にしておくと、後々 Quadlet（systemd サービスとしてコンテナ管理）も使えて運用が楽になります。
 
