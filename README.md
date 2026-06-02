@@ -77,10 +77,47 @@ claude
 ```bash
 # proxy のコンテナログ
 podman-compose logs proxy
-
-# mitmproxy でキャプチャしたトラフィックを確認
-mitmweb --rfile volumes/logs/traffic.bin
 ```
+
+#### mitmweb でトラフィックをブラウザ確認
+
+`volumes/logs/traffic.bin` は mitmproxy のバイナリフロー形式で保存されています。
+`mitmweb` を使うとブラウザ上で各リクエスト／レスポンスの内容（ヘッダ・ボディ・gzip展開済み）を確認できます。
+
+**Podman の場合**
+
+```bash
+podman run --rm \
+  -v ./volumes/logs:/logs:ro \
+  -p 8081:8081 \
+  docker.io/mitmproxy/mitmproxy \
+  mitmweb --rfile /logs/traffic.bin --web-host 0.0.0.0
+```
+
+**Docker の場合**
+
+```bash
+docker run --rm \
+  -v ./volumes/logs:/logs:ro \
+  -p 8081:8081 \
+  mitmproxy/mitmproxy \
+  mitmweb --rfile /logs/traffic.bin --web-host 0.0.0.0
+```
+
+起動後、ブラウザで `http://localhost:8081` を開くと GUI でトラフィックを閲覧できます。
+ポート `8081` がすでに使用中の場合は `-p 8082:8081` のように変更してください。
+
+> **テキストで確認したい場合（コンテナ不要）**
+>
+> ```bash
+> # Podman
+> podman run --rm -v ./volumes/logs:/logs:ro \
+>   docker.io/mitmproxy/mitmproxy mitmdump --rfile /logs/traffic.bin
+>
+> # Docker
+> docker run --rm -v ./volumes/logs:/logs:ro \
+>   mitmproxy/mitmproxy mitmdump --rfile /logs/traffic.bin
+> ```
 
 ### 終了
 
