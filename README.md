@@ -33,6 +33,225 @@ Claude Code を DeepSeek API バックエンドで動かすための、ネット
 - `podman` および `podman-compose` がインストール済みであること
 - DeepSeek の API キーを取得済みであること
 
+## Podman のインストール（Ubuntu 24.04を例として）
+
+以下の手順は Ubuntu 24.04 向けです。WSL2 上の Ubuntu 24.04 でも基本的に同じ手順で動作します。WSL2 固有の追加設定が必要な箇所については後述します。
+
+### インストール
+
+Ubuntu 24.04 の公式リポジトリに Podman が含まれているので、apt で入ります。
+
+```bash
+sudo apt update
+sudo apt install -y podman
+```
+
+#### podman-compose は pipx でインストールする（推奨）
+
+apt の podman-compose はパッケージ更新の遅延により古いバージョン（1.0.6 など）が入る場合があります。古いバージョンでは `podman-compose exec` 等の実行時に**環境変数（API キーを含む）がターミナルに平文で出力される**既知の問題があります。pipx で最新版を入れることでこの問題を回避できます。
+
+```bash
+# pipx のインストール
+sudo apt install -y pipx
+pipx ensurepath
+
+# 新しいシェルセッションを開くかパスを反映してから
+source ~/.bashrc  # または ~/.zshrc
+
+# podman-compose のインストール
+pipx install podman-compose
+```
+
+バージョン確認：
+
+```bash
+podman --version
+podman-compose --version
+```
+
+### rootless 使用のための設定
+
+#### 1. subuid / subgid の確認・設定
+
+rootless Podman はユーザー名前空間のために `/etc/subuid` と `/etc/subgid` が必要です。
+
+```bash
+grep $USER /etc/subuid /etc/subgid
+```
+
+エントリがなければ追加：
+
+```bash
+sudo usermod --add-subuids 100000-165535 --add-subgids 100000-165535 $USER
+```
+
+#### 2. newuidmap / newgidmap の確認
+
+```bash
+which newuidmap newgidmap
+# → /usr/bin/newuidmap 等が返ればOK
+```
+
+なければインストール：
+
+```bash
+sudo apt install -y uidmap
+```
+
+#### 3. ストレージ設定の初期化
+
+```bash
+podman system migrate
+```
+
+#### 4. 動作確認
+
+```bash
+podman run --rm hello-world
+podman info | grep -E 'rootless|storage'
+```
+
+### WSL2 固有の注意事項
+
+#### cgroupv2 の問題
+
+WSL2 のデフォルト設定では cgroup v2 が有効になっていない場合があります。
+
+```bash
+cat /sys/fs/cgroup/cgroup.controllers
+```
+
+何も出ない・ファイルがない場合は `%USERPROFILE%\.wslconfig` に以下を追記して WSL を再起動：
+
+```ini
+[wsl2]
+kernelCommandLine=cgroup_no_v1=all systemd.unified_cgroup_hierarchy=1
+```
+
+```powershell
+# PowerShell から再起動
+wsl --shutdown
+```
+
+#### systemd の有効化（推奨）
+
+`/etc/wsl.conf` で有効化：
+
+```ini
+[boot]
+systemd=true
+```
+
+これも `wsl --shutdown` 後に反映されます。
+
+#### ネットワーク（slirp4netns）
+
+rootless では `slirp4netns` がネットワークに使われます：
+
+```bash
+sudo apt install -y slirp4netns
+```
+
+`passt` ベースの新しいネットワーク実装（`netavark` + `aardvark-dns`）も Ubuntu 24.04 の Podman 4.x では利用可能ですが、WSL2 との相性で問題が出ることがあるため、まず動作確認してから切り替えを検討するのが無難です。
+
+#### `/proc/sys/kernel/unprivileged_userns_clone`
+
+Ubuntu では通常デフォルトで有効ですが念のため確認：
+
+```bash
+cat /proc/sys/kernel/unprivileged_userns_clone
+# → 1 であればOK（0 なら sudo sysctl kernel.unprivileged_userns_clone=1）
+```
+
+#### ambient capability 昇格の警告（`can't raise ambient capability`）
+
+`podman-compose up` 等でコンテナ起動時に以下のような警告が出ることがあります：
+
+```
+time="..." level=warning msg="can't raise ambient capability CAP_CHOWN: operation not permitted"
+time="..." level=warning msg="can't raise ambient capability CAP_DAC_OVERRIDE: operation not permitted"
+time="..." level=warning msg="can't raise ambient capability CAP_FOWNER: operation not permitted"
+time="..." level=warning msg="can't raise ambient capability CAP_SETUID: operation not permitted"
+time="..." level=warning msg="can't raise ambient capability CAP_SETGID: operation not permitted"
+（他 CAP_KILL, CAP_NET_BIND_SERVICE, CAP_SETFCAP, CAP_SETPCAP, CAP_SYS_CHROOT 等）
+```
+
+**原因：** OCI ランタイム（crun/runc）がコンテナプロセスのケイパビリティを ambient セットに昇格しようとしますが、WSL2 カーネル（Microsoft カスタムビルド）がユーザー名前空間内での `prctl(PR_CAP_AMBIENT_RAISE, ...)` syscall を追加制限しているため発生します。ネイティブ Linux カーネルでは同操作が許可されているため、同じ設定でもこの警告は出ません。
+
+**実害なし。** ambient への昇格に失敗しても、コンテナ内プロセスは `inheritable` ケイパビリティセット経由で必要な権限を保持するため、コンテナの動作に影響しません。`userns_mode: keep-id` も正常に機能します。
+
+#### マウント伝播の警告（`"/" is not a shared mount`）
+
+`podman system migrate` 等で以下の警告が出ることがあります：
+
+```
+WARN[0000] "/" is not a shared mount, this could cause issues or missing mounts with rootless containers
+```
+
+WSL2 ではデフォルトで `/` が `private` マウントになっているために発生する既知の問題です。確認：
+
+```bash
+cat /proc/self/mountinfo | grep ' / ' | head -5
+# peer グループの記載がなく "private" になっているはず
+```
+
+**方法1：一時的に修正（再起動で消える）**
+
+```bash
+sudo mount --make-rshared /
+```
+
+**方法2：WSL 起動時に自動適用（推奨）**
+
+systemd unit として設定する：
+
+```bash
+sudo tee /etc/systemd/system/wsl-mount-fix.service << 'EOF'
+[Unit]
+Description=Fix mount propagation for rootless Podman on WSL2
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/mount --make-rshared /
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl enable wsl-mount-fix.service
+sudo systemctl start wsl-mount-fix.service
+```
+
+> この警告は通常のコンテナ実行（`podman run`）では問題になりません。bind mount の伝播など特殊なケースでのみ顕在化します。
+
+### インストール後の確認チェックリスト
+
+```bash
+# rootless で動くか
+podman run --rm alpine echo "rootless OK"
+
+# UID マッピング確認
+podman unshare cat /proc/self/uid_map
+
+# ストレージドライバー確認（overlay が望ましい）
+podman info | grep graphDriverName
+```
+
+### よくある問題
+
+| 症状 | 原因 | 対処 |
+|------|------|------|
+| `ERRO: cannot re-exec process` | newuidmap が SUID でない | `sudo chmod u+s /usr/bin/newuidmap` |
+| `overlay` が使えず `vfs` になる | カーネルの overlay 対応不足 | WSL2 カーネル更新 or `fuse-overlayfs` 導入 |
+| コンテナが起動直後に落ちる | cgroupv2 無効 | 上記 `.wslconfig` 対応 |
+| DNS が引けない | `aardvark-dns` の WSL2 非互換 | `netavark` → `slirp4netns` に戻す |
+| `can't raise ambient capability ...` の警告（WSL2 のみ） | WSL2 カーネルが `PR_CAP_AMBIENT_RAISE` を制限 | 実害なし。無視して可 |
+| `exec` 時に環境変数・API キーが端末に出力される | podman-compose が古い（apt 版 1.0.6 等） | pipx で最新版に置き換える |
+
+基本的には **systemd 有効 + cgroupv2 有効** の状態にしておくと、後々 Quadlet（systemd サービスとしてコンテナ管理）も使えて運用が楽になります。
+
 ## セットアップ
 
 ### 1. `.env` ファイルを作成する
