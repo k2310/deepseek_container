@@ -6,6 +6,8 @@ volumes/proxy/logs/*
 !volumes/proxy/logs/.gitkeep
 volumes/proxy/mitmproxy-ca/*
 !volumes/proxy/mitmproxy-ca/.gitkeep
+volumes/code/home/*
+!volumes/code/home/.gitkeep
 
 # 一時ファイル
 tmp/

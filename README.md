@@ -27,6 +27,7 @@ Claude Code を DeepSeek API バックエンドで動かすための、ネット
 - **`code` コンテナはインターネット直接不可** — `ai-sandbox-net`（internal）にのみ接続しており、外部への通信はすべて `proxy` 経由に強制されます。
 - **通信の可視化** — mitmproxy が全トラフィックを `volumes/proxy/logs/traffic.bin` に記録するため、AI エージェントが何を送受信しているかを事後検査できます。
 - **DeepSeek を Anthropic 互換 API として利用** — `ANTHROPIC_BASE_URL` を DeepSeek のエンドポイントに向けることで、Claude Code をそのまま DeepSeek モデルで動作させます。
+- **coder ホームディレクトリの永続化** — `volumes/code/home/` を `/home/coder` にマウントすることで、シェル設定（`.bashrc` など）・SSH 鍵・Claude Code の設定をコンテナ再作成後も保持します。
 
 ## 前提条件
 
@@ -354,8 +355,11 @@ podman-compose down
 │   ├── Dockerfile        # code コンテナの定義（Claude Code インストール済み）
 │   └── entrypoint.sh
 └── volumes/
-    ├── logs/             # mitmproxy のトラフィックログ（traffic.bin）
-    └── mitmproxy-ca/     # mitmproxy CA 証明書（proxy・code 両方がマウント）
+    ├── proxy/
+    │   ├── logs/         # mitmproxy のトラフィックログ（traffic.bin）
+    │   └── mitmproxy-ca/ # mitmproxy CA 証明書（proxy・code 両方がマウント）
+    └── code/
+        └── home/         # coder ユーザのホームディレクトリ（シェル設定・SSH鍵など永続化）
 ```
 
 ## 環境変数（`code` コンテナ）

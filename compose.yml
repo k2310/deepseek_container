@@ -43,6 +43,7 @@ services:
     volumes:
       - ${WORKSPACE_HOST_PATH}:/workspace:rw
       - ./volumes/proxy/mitmproxy-ca:/ca:ro
+      - ./volumes/code/home:/home/coder:rw
     userns_mode: keep-id
     stdin_open: true
     tty: true
