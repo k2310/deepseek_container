@@ -2,10 +2,10 @@
 .env
 
 # ランタイムデータ（コンテナ実行時に生成、ディレクトリ自体は .gitkeep で管理）
-volumes/logs/*
-!volumes/logs/.gitkeep
-volumes/mitmproxy-ca/*
-!volumes/mitmproxy-ca/.gitkeep
+volumes/proxy/logs/*
+!volumes/proxy/logs/.gitkeep
+volumes/proxy/mitmproxy-ca/*
+!volumes/proxy/mitmproxy-ca/.gitkeep
 
 # 一時ファイル
 tmp/

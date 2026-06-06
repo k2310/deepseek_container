@@ -15,8 +15,8 @@ services:
       - external-net      # インターネットへ出る
     command: mitmdump --save-stream-file /logs/traffic.bin
     volumes:
-      - ./volumes/logs:/logs:rw
-      - ./volumes/mitmproxy-ca:/home/mitmproxy/.mitmproxy:rw
+      - ./volumes/proxy/logs:/logs:rw
+      - ./volumes/proxy/mitmproxy-ca:/home/mitmproxy/.mitmproxy:rw
 
   code:
     build:
@@ -42,7 +42,7 @@ services:
       - CLAUDE_CODE_EFFORT_LEVEL=max
     volumes:
       - ${WORKSPACE_HOST_PATH}:/workspace:rw
-      - ./volumes/mitmproxy-ca:/ca:ro
+      - ./volumes/proxy/mitmproxy-ca:/ca:ro
     userns_mode: keep-id
     stdin_open: true
     tty: true

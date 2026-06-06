@@ -25,7 +25,7 @@ Claude Code を DeepSeek API バックエンドで動かすための、ネット
 ### 設計意図
 
 - **`code` コンテナはインターネット直接不可** — `ai-sandbox-net`（internal）にのみ接続しており、外部への通信はすべて `proxy` 経由に強制されます。
-- **通信の可視化** — mitmproxy が全トラフィックを `volumes/logs/traffic.bin` に記録するため、AI エージェントが何を送受信しているかを事後検査できます。
+- **通信の可視化** — mitmproxy が全トラフィックを `volumes/proxy/logs/traffic.bin` に記録するため、AI エージェントが何を送受信しているかを事後検査できます。
 - **DeepSeek を Anthropic 互換 API として利用** — `ANTHROPIC_BASE_URL` を DeepSeek のエンドポイントに向けることで、Claude Code をそのまま DeepSeek モデルで動作させます。
 
 ## 前提条件
@@ -300,14 +300,14 @@ podman-compose logs proxy
 
 #### mitmweb でトラフィックをブラウザ確認
 
-`volumes/logs/traffic.bin` は mitmproxy のバイナリフロー形式で保存されています。
+`volumes/proxy/logs/traffic.bin` は mitmproxy のバイナリフロー形式で保存されています。
 `mitmweb` を使うとブラウザ上で各リクエスト／レスポンスの内容（ヘッダ・ボディ・gzip展開済み）を確認できます。
 
 **Podman の場合**
 
 ```bash
 podman run --rm \
-  -v ./volumes/logs:/logs:ro \
+  -v ./volumes/proxy/logs:/logs:ro \
   -p 8081:8081 \
   docker.io/mitmproxy/mitmproxy \
   mitmweb --rfile /logs/traffic.bin --web-host 0.0.0.0
@@ -317,7 +317,7 @@ podman run --rm \
 
 ```bash
 docker run --rm \
-  -v ./volumes/logs:/logs:ro \
+  -v ./volumes/proxy/logs:/logs:ro \
   -p 8081:8081 \
   mitmproxy/mitmproxy \
   mitmweb --rfile /logs/traffic.bin --web-host 0.0.0.0
@@ -330,11 +330,11 @@ docker run --rm \
 >
 > ```bash
 > # Podman
-> podman run --rm -v ./volumes/logs:/logs:ro \
+> podman run --rm -v ./volumes/proxy/logs:/logs:ro \
 >   docker.io/mitmproxy/mitmproxy mitmdump --rfile /logs/traffic.bin
 >
 > # Docker
-> docker run --rm -v ./volumes/logs:/logs:ro \
+> docker run --rm -v ./volumes/proxy/logs:/logs:ro \
 >   mitmproxy/mitmproxy mitmdump --rfile /logs/traffic.bin
 > ```
 
